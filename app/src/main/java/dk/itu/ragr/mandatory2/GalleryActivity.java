@@ -19,16 +19,43 @@ import java.net.URL;
 import java.util.ArrayList;
 
 public class GalleryActivity extends AppCompatActivity {
-    ViewPager pager;
+
+    private static final String EXTRA_IMAGE_LIST = "EXTRA_IMAGE_LIST";
+    private ViewPager pager;
+    private String[] imageList;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_gallery);
         pager = (ViewPager)findViewById(R.id.viewPager);
+        if (savedInstanceState == null || savedInstanceState.getStringArray(EXTRA_IMAGE_LIST) == null) {
+            new ImageListDownloader().execute();
+        }
+        else{
+            setImageList(savedInstanceState.getStringArray(EXTRA_IMAGE_LIST));
+        }
+    }
 
-        ImageListDownloader downloader = new ImageListDownloader();
-        downloader.execute();
+    private void setImageList(String[] images)
+    {
+        imageList = images;
+        try {
+            pager.setAdapter(new PagerAdaptor(getSupportFragmentManager()));
+        }
+        catch (Exception e){
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putStringArray(EXTRA_IMAGE_LIST, imageList);
+    }
+
+    public void scrollToItem(int position){
+        pager.setCurrentItem(position, true);
     }
 
     private class ImageListDownloader extends AsyncTask<Void, Void, String[]> {
@@ -48,20 +75,14 @@ public class GalleryActivity extends AppCompatActivity {
         protected void onPostExecute(String[] strings) {
             super.onPostExecute(strings);
             pd.dismiss();
-
-            try {
-                pager.setAdapter(new PagerAdaptor(getSupportFragmentManager(), strings));
-            }
-            catch (Exception e){
-                throw new RuntimeException(e);
-            }
+            setImageList(strings);
         }
 
         @Override
         protected String[] doInBackground(Void... params) {
             HttpURLConnection connection = null;
             try {
-                Thread.sleep(5000);
+                Thread.sleep(1000); //We can wait a bit.. ;)
                 ArrayList<String> items = new ArrayList<>();
                 connection = (HttpURLConnection) new URL(baseUrl).openConnection();
                 JsonReader reader = new JsonReader(new BufferedReader(new InputStreamReader(connection.getInputStream())));
@@ -81,29 +102,19 @@ public class GalleryActivity extends AppCompatActivity {
     }
 
     private class PagerAdaptor extends FragmentPagerAdapter{
-        String[] urls; /*= new String[]{
-            "img/2608-1273524021cCGQ.jpg",
-            "img/church-silhouette-8712964986014Kb.jpg",
-            "img/ivy-on-house-in-autumn-112881926976ezt.jpg",
-            "img/night-in-the-city-21851292200793awk.jpg",
-            "img/old-castle-gate-11281969200foh6.jpg",
-            "img/shack-29211280016930gtkz.jpg"
-        };
-*/
 
-        public PagerAdaptor(FragmentManager fm, String[] urls) throws IOException {
+        public PagerAdaptor(FragmentManager fm) throws IOException {
             super(fm);
-            this.urls = urls;
         }
 
         @Override
-        public Fragment getItem(int position) {
-            return ImageFragment.newInstance(urls[position]);
+        public Fragment getItem(final int position) {
+            return ImageFragment.newInstance(imageList[position], imageList);
         }
 
         @Override
         public int getCount() {
-            return urls.length;
+            return imageList.length;
         }
     }
 
